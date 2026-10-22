@@ -1,0 +1,1054 @@
+---
+title: "Proyecto Análisis de Datos: EV 2025"
+author: "Carlos Tesoriero y Juan Camilo Fajardo"
+date: "2025-11-15"
+output:
+  html_document:
+    theme: flatly
+    highlight: tango
+    toc: true
+    toc_depth: 4
+    toc_float: true
+    css: styles.css
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+![](images/DE%20Best%20Electric%20cars_aezueg.webp)
+
+## Introduccion
+
+El auge reciente del mercado de vehículos eléctricos ha transformado por completo la forma en que se entiende el desempeño automotriz. A diferencia de los autos de combustión interna —donde la potencia, el peso y el consumo están ligados de manera rígida— los vehículos eléctricos operan bajo principios mecánicos y energéticos distintos. Las baterías, los motores eléctricos, la aerodinámica y la eficiencia del tren motriz influyen de manera compleja y, en muchos casos, contraintuitiva.
+
+En este proyecto analizamos una base de datos con especificaciones técnicas de 478 modelos eléctricos disponibles en el mercado global para responder cinco preguntas centrales:
+
+1.  **¿Qué factores afectan más la eficiencia energética de un vehículo eléctrico?**\
+    Evaluamos variables de desempeño, capacidades mecánicas y diferencias entre marcas para entender qué realmente determina el consumo en Wh/km.
+
+2.  **¿Los vehículos con specs deportivos —principalmente menor tiempo de aceleración— sacrifican autonomía?**\
+    Contrastamos la intuición heredada de los autos de gasolina con evidencia estadística mediante pruebas no paramétricas y modelos de regresión.
+
+3.  **¿Existen diferencias entre marcas nativas EV y marcas tradicionales?**\
+    Analizamos si el origen del fabricante influye en la autonomía, eficiencia y aceleración, o si estas diferencias son consecuencia de la presencia de modelos deportivos.
+
+4.  **¿La capacidad de la batería determina la autonomía?**\
+    Estudiamos la relación entre tamaño de batería y rango para evaluar qué tan lineal o fuerte es esta dependencia.
+
+5.  **¿El tamaño, tipo de carrocería y número de asientos afectan la eficiencia y autonomía?**\
+    Usamos modelos lineales y ANOVA para medir la influencia del tamaño físico y diseño del vehículo.
+
+A lo largo del proyecto buscamos no solo resultados estadísticos, sino interpretaciones que tengan sentido dentro del mundo real del diseño automotriz eléctrico. En conjunto, el análisis permite construir una imagen clara de qué factores realmente importan a la hora de entender el rendimiento de un coche eléctrico moderno.
+
+## Cargar los datos
+
+La base de datos escogida fue el de los specs de carros electricos.
+
+```{r}
+library(readr)
+electric_vehicles_spec_2025 <- read_csv("electric_vehicles_spec_2025.csv")
+data<-read_csv("electric_vehicles_spec_2025.csv")
+View(electric_vehicles_spec_2025)
+```
+
+## Segmento 1: ¿Qué factores afectan mas la eficiencia del coche?
+
+![](images/Car_Spec_Check_Caranalytics.webp)
+
+### 1.1 Introduccion
+
+En esta sección se busca determinar cuáles son los factores que influyen de manera más significativa en la eficiencia energética de los vehículos eléctricos. Para ello, se estima un modelo de regresión lineal múltiple en el que la eficiencia (Wh/km) se considera como la variable dependiente, mientras que la velocidad máxima, la capacidad de la batería, el torque, la autonomía y la marca del vehículo actúan como variables explicativas. El objetivo es evaluar la magnitud y dirección de la relación entre cada uno de estos factores y la eficiencia, con el fin de identificar cuáles presentan una mayor capacidad predictiva y, por tanto, un impacto más relevante en el desempeño energético del vehículo.
+
+### 1.2 Creacion del modelo lineal multiple
+
+```{r}
+data$brand <- as.factor(data$brand)
+modelo <- lm(efficiency_wh_per_km ~ top_speed_kmh +
+                         battery_capacity_kWh +
+                         torque_nm +
+                         range_km +
+                         brand,
+  data = data
+)
+summary(modelo)
+```
+
+Con el modelo lineal múltiple podemos identificar cuáles variables realmente afectan la eficiencia de un carro eléctrico. Primero verificamos que el modelo sí fuera significativo. El R-cuadrado de 72.5% nos muestra que el modelo explica buena parte de la variación en la eficiencia, y el p-value del F-estadístico, que es extremadamente pequeño, confirma que el modelo es estadísticamente válido y que al menos una de las variables sí influye en la eficiencia.
+
+Al revisar los coeficientes vemos que las variables que sí tienen un efecto significativo son la autonomía, la capacidad de la batería y la marca. Por el contrario, la velocidad máxima y el torque no muestran un impacto importante. En cuanto a las marcas, solo algunas resultan significativas: por ejemplo, Dacia y Fiat aparecen como más eficientes, mientras que Porsche, BMW y Lotus muestran consumos más altos.
+
+### 1.3 Separacion de variables y creacion de graficas
+
+Con esto claro, podemos apoyarnos en las gráficas comparando cada variable con la eficiencia para visualizar mejor estas relaciones.
+
+```{r}
+library(ggplot2)
+g_speed_eff <- ggplot(data, aes(x = top_speed_kmh, y = efficiency_wh_per_km)) +
+  geom_point(alpha = 0.5, color = "purple") +
+  geom_smooth(method = "lm", color = "red", linewidth = 1) +
+  theme_minimal() +
+  labs(
+    title = "Velocidad Maxima vs Eficiencia",
+    x = "Velocidad Maxima (km/h)",
+    y = "Eficiencia (Wh/km)"
+  ) +
+  theme(
+    axis.title.x = element_text(size = 12, face = "bold", margin = margin(t = 10)),
+    axis.title.y = element_text(size = 12, face = "bold", margin = margin(r = 10)),
+    plot.title = element_text(size = 14, face = "bold")
+  )
+
+g_speed_eff
+
+```
+
+La gráfica muestra que no hay una tendencia clara entre la velocidad máxima y la eficiencia (Wh/km). Los puntos están dispersos, lo que confirma que la velocidad máxima no influye de manera significativa en el consumo energético del vehículo.
+
+```{r}
+g_batt_eff <- ggplot(data, aes(x = battery_capacity_kWh, y = efficiency_wh_per_km)) +
+  geom_point(alpha = 0.5, color = "blue") +
+  geom_smooth(method = "lm", color = "red", linewidth = 1) +
+  theme_minimal() +
+  labs(
+    title = "Capacidad de la Bateria vs Eficiencia",
+    x = "Capacidad de la Bateria (kWh)",
+    y = "Eficiencia (Wh/km)"
+  ) +
+  theme(
+    axis.title.x = element_text(size = 12, face = "bold", margin = margin(t = 10)),
+    axis.title.y = element_text(size = 12, face = "bold", margin = margin(r = 10)),
+    plot.title = element_text(size = 14, face = "bold")
+  )
+
+g_batt_eff
+```
+
+La gráfica muestra que, a medida que aumenta la capacidad de la batería, también aumenta el consumo energético (Wh/km). Esta tendencia indica que los vehículos con baterías más grandes suelen ser menos eficientes, lo cual coincide con el modelo lineal y el coeficiente positivo obtenido.
+
+```{r}
+g_torque_eff <- ggplot(data, aes(x = torque_nm, y = efficiency_wh_per_km)) +
+  geom_point(alpha = 0.5, color = "darkgreen") +
+  geom_smooth(method = "lm", color = "red", linewidth = 1) +
+  theme_minimal() +
+  labs(
+    title = "Torque vs Eficiencia",
+    x = "Torque (Nm)",
+    y = "Eficiencia (Wh/km)"
+  ) +
+  theme(
+    axis.title.x = element_text(size = 12, face = "bold", margin = margin(t = 10)),
+    axis.title.y = element_text(size = 12, face = "bold", margin = margin(r = 10)),
+    plot.title = element_text(size = 14, face = "bold")
+  )
+
+g_torque_eff
+```
+
+La gráfica muestra que no existe una relación clara entre el torque y la eficiencia (Wh/km). Los puntos están dispersos y no forman ninguna tendencia visible, lo que coincide con el modelo lineal, donde el torque no resultó significativo y no afecta de manera importante el consumo energético del vehículo.
+
+```{r}
+
+g_range_eff <- ggplot(data, aes(x = range_km, y = efficiency_wh_per_km)) +
+  geom_point(alpha = 0.5, color = "steelblue") +
+  geom_smooth(method = "lm", color = "red", linewidth = 1) +
+  theme_minimal() +
+  labs(
+    title = "Autonomia vs Eficiencia",
+    x = "Autonomia (km)",
+    y = "Eficiencia (Wh/km)"
+  ) +
+  theme(
+    axis.title.x = element_text(size = 12, face = "bold", margin = margin(t = 10)),
+    axis.title.y = element_text(size = 12, face = "bold", margin = margin(r = 10)),
+    plot.title = element_text(size = 14, face = "bold")
+  )
+
+g_range_eff
+
+```
+
+La gráfica muestra una relación negativa clara: a medida que aumenta la autonomía (km), el consumo energético por kilómetro disminuye. Esto indica que los vehículos con mayor autonomía tienden a ser más eficientes, coincidiendo con el modelo lineal donde la autonomía fue una de las variables más significativas y con un coeficiente negativo.
+
+```{r}
+g_eff_brand <- ggplot(data, aes(x = brand, y = efficiency_wh_per_km)) +
+  geom_boxplot(fill = "lightblue", color = "black", outlier.color = "red") +
+  theme_minimal() +
+  labs(
+    title = "Eficiencia Energetica por Marca",
+    x = "Marca",
+    y = "Wh/km"
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 7),
+    axis.title.x = element_text(size = 12, face = "bold", margin = margin(t = 10)),
+    axis.title.y = element_text(size = 12, face = "bold", margin = margin(r = 10)),
+    plot.title = element_text(size = 14, face = "bold")
+  )
+
+g_eff_brand
+
+```
+
+El boxplot muestra cómo varía la eficiencia (Wh/km) entre las diferentes marcas. Se observan diferencias claras entre fabricantes: algunas marcas presentan valores más bajos de Wh/km —lo que indica mayor eficiencia— mientras que otras muestran consumos más altos. Esto coincide con el modelo lineal, donde solo ciertas marcas resultaron significativas y demostraron tener un impacto real en la eficiencia energética del vehículo.
+
+Estas gráficas nos permiten visualizar cómo cada factor se relaciona con la eficiencia del vehículo, aunque ya sabemos cuáles variables resultaron significativas en el modelo. Esto puede ser útil para los consumidores que valoran la eficiencia como criterio al momento de elegir un vehículo eléctrico.
+
+### 1.4 Preddiciones del modelo
+
+A partir del comportamiento de los coeficientes, el modelo sugiere las siguientes tendencias:
+
+Si se aumenta la capacidad de la batería, la eficiencia disminuirá, es decir, el vehículo consumirá más Wh/km.
+
+Si se optimiza el vehículo para tener mayor autonomía, el consumo energético tenderá a bajar.
+
+Cambiar la marca —entendida como conjunto de decisiones de diseño— puede modificar la eficiencia incluso si las especificaciones técnicas se mantienen.
+
+Aumentar la velocidad máxima o el torque no modifica significativamente la eficiencia, por lo que estos factores no deberían priorizarse al analizar consumo energético.
+
+Si se quisiera mejorar la eficiencia de un modelo futuro, el diseño debería orientarse más a optimizar el rendimiento global y la aerodinámica que a incrementar capacidades de potencia.
+
+### 1.5 Conclusiones
+
+En resumen, el primer modelo lineal múltiple demuestra que la eficiencia energética de un coche eléctrico está fuertemente influenciada por la capacidad de la batería, la autonomía y por diferencias intrínsecas entre marcas. Factores relacionados con desempeño (velocidad máxima, torque) no explican los cambios en consumo energético, mientras que las gráficas confirman visualmente estos patrones y ayudan a entender cómo cada variable afecta el comportamiento energético del vehículo.
+
+## Segmento 2: ¿Los specs deportivos reducen el rango?
+
+![](images/FAST-FURIOUS-articulo.webp)
+
+Cuando un individuo busca comprar un carro, normalmente tiene en mente un conjunto particular de características: algunos priorizan la comodidad, otros la eficiencia, otros la capacidad de carga y, por supuesto, hay quienes buscan un vehículo con un enfoque claramente deportivo. Y aunque esto se observa en todo tipo de automóviles, es especialmente interesante en el caso de los vehículos eléctricos, donde cada componente está optimizado con un delicado balance entre potencia, eficiencia y autonomía.
+
+En los carros de gasolina, el fenómeno es familiar: mientras más deportivo o potente es el motor, más combustible consume y más liviano debe ser el vehículo para mantener la agilidad. El resultado es casi inevitable: **aumentar el desempeño suele implicar sacrificar eficiencia**. Sin embargo, en los vehículos eléctricos esta relación no es tan intuitiva. La entrega de potencia depende de motores eléctricos, inversores y baterías que no funcionan bajo las mismas reglas físicas que un motor de combustión interna. Por eso surge una pregunta interesante:
+
+**¿Hacer más deportivo un vehículo eléctrico afecta negativamente su rango?**
+
+Muchos usuarios creen que sí. Argumentan que tiempos de aceleración más rápidos requieren motores más potentes, lo cual podría significar mayor consumo energético por kilómetro. Otros sostienen que el efecto es mínimo porque la aceleración solo demanda pulsos breves de energía y no influye en el comportamiento del vehículo en conducción normal. E incluso hay quien piensa que la eficiencia aerodinámica ---más típica en modelos deportivos eléctricos--- podría compensar cualquier pérdida.
+
+En otras palabras, existe una verdadera duda sobre si la deportividad introduce un **costo de oportunidad** en la autonomía. En términos simples:
+
+> **¿A mayor desempeño deportivo, menor rango disponible?**\
+> ¿O los fabricantes logran ofrecer aceleración y autonomía sin compromisos reales?
+
+En este segmento vamos a investigar precisamente eso. Utilizando la base de datos *Electric Vehicle Specs 2025*, analizaremos la relación entre desempeño deportivo ---medido principalmente a partir del tiempo de aceleración de 0 a 100 km/h--- y la autonomía del vehículo. Para ello aplicaremos pruebas estadísticas clásicas como el **Wilcoxon Test** y modelos de **regresión lineal simple.**
+
+Nuestro objetivo no es simplemente observar una correlación gráfica, sino evaluar si existe **evidencia estadística de un trade-off formal** entre acelerar más rápido y recorrer menos kilómetros por carga. Esto nos permitirá entender si el diseño deportivo tiene un impacto real en el rango o si la relación es más compleja y depende de otros factores como el tamaño de la batería o la eficiencia energética.
+
+### 2.1: Separacion de grupos
+
+Antes de pasar a análisis más complejos, es útil comparar de forma simple si los vehículos con enfoque deportivo muestran un rango menor que los demás. Para esto necesitamos una forma objetiva de definir qué es "deportivo", y el indicador más claro en la base es el tiempo de aceleración 0--100 km/h.
+
+Los modelos que aceleran en 4 segundos o menos suelen considerarse de alto desempeño, mientras que el resto están orientados a eficiencia o uso general. Esta clasificación nos permite dividir la base en dos grupos y comparar su autonomía.
+
+Con esta división inicial evaluaremos, tanto visualmente como mediante un Wilcoxon Rank-Sum Test, si existe evidencia de que los vehículos más deportivos tienden a sacrificar rango. Este análisis introductorio nos ayudará a ver si el posible trade-off entre desempeño y autonomía comienza a aparecer desde la comparación más básica.
+
+Primero crearemosla variable **deportiva** en donde dividimos los carros que tienen una aceleracion de 0-100 km/h menor a 4,5 segundos y los que no. No incluimos la velocidad maxima, ya que muchas marcas ponen limite para sus carros electricos, lo cual no permite que el coche ejecuta su potencia maxima
+
+```{r}
+electric_vehicles_spec_2025$deportivo <- ifelse(
+  electric_vehicles_spec_2025$acceleration_0_100_s < 4.5,
+  "Deportivo",
+  "No deportivo"
+)
+
+table(electric_vehicles_spec_2025$deportivo)
+
+```
+
+Aca vemos una separacion, donde hay 90 vehiculos deportivos y 388n o deportivo. Ahora hacemos una comparacion visual donde se ve la diferencia del rango entre estos dos grupos:
+
+### 2.2 Comparacion de grupos
+
+Antes que nada, queremos ver si existe una diferencia significativa entre los dos grupos (deportivo y no deportivo) en terminos del rango. Con esto sacamos que la hipotesis nula es que el rango de carros deportivos y no deportivos son iguales. La alterna contradice esto, que no son iguales. Paras esta seccion, primero sacamos una comparación visual usando boxplots:
+
+```{r}
+library(ggplot2)
+
+ggplot(electric_vehicles_spec_2025,
+       aes(x = deportivo, y = range_km, fill = deportivo)) +
+  geom_boxplot(alpha = 0.8) +
+  scale_fill_manual(values = c("No deportivo" = "pink",
+                               "Deportivo" = "lightgreen")) +
+  labs(title = "Rango según nivel deportivo",
+       x = "Tipo de vehículo",
+       y = "Rango (km)") +
+  theme_minimal(base_size = 13) +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle = 10, hjust = 1))
+
+```
+
+A simple vista puede parecer que los no deportivos tienen un rango un poco mayor, pero visualmente no es suficiente. Para confirmarlo usamos un Wilcoxon Rank-Sum Test (ideal porque los rangos no siempre son normales). Esto nos permite ver los p-values, para ver si aceptamos o rechazamos la hipotesis nulas:
+
+```{r }
+
+wilcox.test(range_km ~ deportivo, data = electric_vehicles_spec_2025) 
+
+```
+
+Aquí nos resulta un p value extramadamente pequeño, por lo cual rechazamos la hipotesis nula. Tomamos que sí hay diferencia estadisticamente significativa de rango entre los dos grupos.
+
+### 2.3 Regresion lineal simple
+
+Ahora que sabemos que sí existe una diferencia, ahora interesa ver la relación de la aceleración de cada carro con el rango. Ya que el valor de los independientes (acceleracion) no es un factor, podemos hacer un modelo de regresión lineal simple.
+
+-   rango=β0​+β1​⋅(aceleración)
+
+```{r}
+
+library(ggplot2)
+
+modelo_simple <- lm(range_km ~ acceleration_0_100_s, data = electric_vehicles_spec_2025)
+summary(modelo_simple)
+ggplot(electric_vehicles_spec_2025, 
+       aes(x = acceleration_0_100_s, y = range_km)) +
+  geom_point(color = "steelblue", size = 2, alpha = 0.7) +
+  geom_smooth(method = "lm", color = "red", se = FALSE, linewidth = 1.2) +
+  labs(
+    title = "Relación entre aceleración (0–100 km/h) y rango",
+    x = "Aceleración 0–100 (s)",
+    y = "Rango (km)"
+  ) +
+  theme_minimal(base_size = 14)
+
+
+```
+
+Viendo el summary del resultado, nos indica que el beta sub cero (intercept) es 578.663. Esto indica que al tener una acceleración de 0 segundos, el coche electrico tendría un rango de eso mismo en kilometros. El beta sub uno es la relación que tiene el rango con el cambio de acceleración. En este caso es -26.949, resultando una relación negativa, es decir por cada segundo que aumenta la aceleracion de 0-100, el rango disminuye un promedio de -26.949. Por decirlo en forma simple, el rango empeora, a la vez que la aceleracion sea mas lenta.
+
+El β₁ tiene un **p-value \< 2e−16**, lo que significa una evidencia absoluta de relación.
+
+El R² = 0.5076 Esto significa que **la aceleración por sí sola explica más del 50% del rango total del vehículo**. Para un modelo con una sola variable, ese valor es sorprendentemente alto. Nos dice que los coches más lentos tienen sistemáticamente menos rango, y los más rápidos, más rango.
+
+Pero aquí es donde viene lo interesante:\
+**esto contradice completamente la lógica de los carros a gasolina.**
+
+Tal vez se asuma que el tamaño de la batería es completamente el responsable de esto, entre mas deportivo, más sofisticado el carro y la marca, para comprobarlos hacemos un simple modelo multiple incluyendo la capacidad de la bateria como parametro también.
+
+```{r}
+modelo3 <- lm(range_km ~acceleration_0_100_s + battery_capacity_kWh, data = electric_vehicles_spec_2025) 
+summary(modelo3)
+
+```
+
+Aca el p value de ambos son iguales de pequeños, diciendo que no están correlados del todo, sino que la acceleracion en sí tambien afecta el rango significantemente.
+
+### 2.4 Predicciones
+
+Con este modelo de regresion lineal, tambien podemos tener un área de prediccion y confianza de la media. Esto se hace con un 95% de intervalo de confianza. Asi podríamos predecir cuanto rango tenga un carro según su aceleración.
+
+Luego agregamos las bandas de:
+
+-   **Intervalo de confianza (IC)** de la recta estimada
+
+-   **Intervalo de predicción (IP)** para valores individuales
+
+El IC muestra dónde estaría la “verdadera recta”.\
+El IP muestra dónde caerían vehículos individuales nuevos.
+
+```{r}
+library(ggplot2)
+
+# Datos ordenados
+df_sorted <- electric_vehicles_spec_2025[order(electric_vehicles_spec_2025$acceleration_0_100_s), ]
+
+# Predicciones
+conf <- predict(modelo_simple, newdata = df_sorted, interval="confidence")
+pred <- predict(modelo_simple, newdata = df_sorted, interval="prediction")
+
+# Unimos las predicciones al df ordenado
+df_plot <- cbind(df_sorted, 
+                 fit = conf[,"fit"],
+                 conf_low = conf[,"lwr"],
+                 conf_up  = conf[,"upr"],
+                 pred_low = pred[,"lwr"],
+                 pred_up  = pred[,"upr"])
+
+# Gráfico en ggplot
+ggplot(df_plot, aes(x = acceleration_0_100_s, y = range_km)) +
+  geom_point(alpha = 0.5, size = 1.8) +
+  
+  # Banda de confianza (intervalo de la recta estimada)
+  geom_ribbon(aes(ymin = conf_low, ymax = conf_up),
+              fill = "blue", alpha = 0.15) +
+  
+  # Banda de predicción (incertidumbre real)
+  geom_ribbon(aes(ymin = pred_low, ymax = pred_up),
+              fill = "green", alpha = 0.10) +
+  
+  # Recta del modelo
+  geom_line(aes(y = fit), color = "red", linewidth = 1.1) +
+  
+  labs(
+    title = "Rango vs aceleración con intervalos de confianza y predicción",
+    x = "Aceleración 0–100 (s)",
+    y = "Rango (km)"
+  ) +
+  theme_minimal()
+```
+
+Y esta relación no es débil, ni casual, ni ruidosa: es consistente en casi todos los puntos de la base.
+
+### 2.5 Conclusiones
+
+Este resultado es sorprendente porque va totalmente en contra de la intuición que traemos del mundo de los autos de gasolina. En un carro de combustión, la regla es casi universal: **mientras más deportivo es el auto, más rango pierde**, porque los motores grandes y potentes consumen mucho más combustible. En ese universo, potencia = consumo = menos autonomía.
+
+Pero en los vehículos eléctricos la historia es distinta.
+
+Nuestros análisis —tanto el Wilcoxon como la regresión lineal— muestran que **los autos con mejor aceleración tienden a tener mayor rango**, no menor. El coeficiente de la regresión (-26.95) indica que si un auto tarda 1 segundo más en acelerar de 0–100 km/h, en promedio **pierde alrededor de 27 km de autonomía**. Es decir: **los que aceleran más rápido también recorren más**.
+
+Esto parece contradictorio… hasta que entendemos cómo funciona el diseño de los EV modernos.
+
+Los autos eléctricos deportivos no dependen de un motor grande que “trague combustible”, sino de **motores más eficientes y baterías más avanzadas**, que las marcas solo instalan en sus modelos de gama más alta.
+
+Un factor que no estaba considerado porque no estaba en la base de datos era el precio de cada carro. Lo más predecible era que los más deportivos tambien eran de gama alta, significando mejor calidad en todo aspecto.
+
+## Segmento 3: Nativas EV vs marcas tradicionales: ¿Que prioriza cada uno?
+
+![](images/Infographic-3b-bg.png)
+
+Ultimamente, a partir del siglo 2000, han llegado varias marcas que inicializaron como fabricante de carros electricos. A partir del 2020, a llegado un boom y auge en el numero de estas empresas. Estas marcas “nativas EV”, como Tesla, Rivian, Lucid o NIO, no tiene modelos de combustión ni estructuras heredadas. En cambio, construyen sus modelos desde cero alrededor de una batería y un tren motriz eléctrico. Del otro lado están los fabricantes tradicionales como BMW, Mercedes, Toyota, Ford, Hyundai, Volkswagen, entre otros. Ellos durante décadas se enfocaron en motores de combustión interna y solo en los últimos años han acelerado la transición hacia lo eléctrico. Ellos han adaptado sus modelos o construido nuevos al formato electrico, lo cual interesa ver si hay una diferencia entre como si estas empresas agarraron claves caracteristicas de sus modelos anteriores.
+
+Con esto vamos a responder la siguiente pregunta general:\
+**¿Se diferencian los vehículos de marcas nativas EV y los de marcas tradicionales en sus prioridades técnicas?**\
+Se interesa ver, si cada grupo prioriza cosas distintas cuando fabrica un carro eléctrico. Uno naciendo ya con la ideología de construir coches electricos, el otro adaptandose a ese mercado.
+
+La pregunta es relevante porque ambas clases de fabricantes parten de condiciones muy diferentes. Las marcas tradicionales suelen adaptar plataformas existentes, lo que puede implicar vehículos más pesados o menos eficientes, pero con una ingeniería madura y recursos globales. Las nativas EV, en cambio, suelen enfocarse en aceleración, baterías grandes, software avanzado y optimización centrada únicamente en la movilidad eléctrica.
+
+Esto nos lleva a una comparación donde vamos a analizar las siguientes preguntas:
+
+-   **¿Cual tiene mas rango?**
+
+-   **¿Cual es mas eficiente?**
+
+-   **¿Qué grupo tiende a priorizar la aceleración?**
+
+-   **¿Hay diferencias significativas en tamaño de batería, eficiencia o capacidades de carga?**
+
+Para este segmento clasificaremos cada marca como **nativa EV** o **tradicional** y compararemos sus especificaciones mediante visualizaciones, pruebas no paramétricas (como Wilcoxon) y modelos de regresión para evaluar si el tipo de fabricante predice specs del coche.
+
+El objetivo es entender si estas dos corrientes del mercado eléctrico tienen perfiles técnicos distintos, y si estas diferencias son reales o simplemente percepciones influenciadas por la fama de cada marca.
+
+### 3.1 Separacion de grupos
+
+Antes de poder comparar nada, necesitamos dividir las marcas en dos grandes familias:\
+**las que nacieron siendo eléctricas desde el día uno** y **las que vienen del mundo de combustión** y después migraron a lo eléctrico.
+
+La idea aquí es crear una variable que marque esa diferencia, porque eso es lo que nos permitirá ver si existe algún patrón en las especificaciones técnicas de ambos lados.
+
+Las *nativas EV* son marcas tipo Tesla, Rivian, Lucid, NIO, etc., que no tienen herencia de motores de combustión, y eso se nota en cómo diseñan sus autos: plataformas completamente eléctricas desde cero, baterías enormes, aceleración absurda y software al centro de la experiencia.
+
+Las marcas *tradicionales*, en cambio, vienen de décadas de construir motores gasolina y diésel. Muchas veces hicieron el “salto” al eléctrico adaptando plataformas existentes o lanzando versiones eléctricas de modelos que ya tenían. Eso puede afectar el peso, la eficiencia o incluso las prioridades en diseño.
+
+Con esa lógica, construimos una columna llamada **origen** que indica si una marca es “Nativa EV” o “Tradicional”.
+
+```{r pressure, echo=FALSE}
+marcas_nativas <- c(
+  "Tesla", "Rivian", "Lucid", "NIO", "XPENG", "BYD", "Aiways","Polester","Zeekr",   "Leapmotor","VinFast","Omoda","Maxus","Skywell","Elaris","Maxus"
+)
+
+marcas_tradicionales <- c(
+  "Abarth","Toyota","Ford","BMW","Mercedes-Benz","Volkswagen","Audi",
+  "Hyundai","Kia","Volvo","Chevrolet","Nissan","Mazda",
+  "Porsche","Jeep","Jaguar","Subaru","Alfa","Citroen","Fiat",
+  "Lexus","MG","Mini","Opel","Peugeot","Renault","Skoda","Maserati","Dongfenf","Dacia","DS","Honda","Hongqi","Lancia","Lotus","Volvo")
+
+
+electric_vehicles_spec_2025$origen <- ifelse(
+  electric_vehicles_spec_2025$brand %in% marcas_nativas,
+  "Nativa EV",
+  "Tradicional")
+
+table(electric_vehicles_spec_2025$origen)
+```
+
+### 3.2 Comparaciones
+
+Ahora que tenemos los grupos definidos, la idea es ver si realmente se comportan distinto en cosas como:
+
+-   rango (km)
+
+-   aceleración 0–100
+
+-   eficiencia energética (Wh/km)
+
+-   capacidad de batería
+
+Primero visualizamos luego hacemos un test estadístico luego interpretamos. No hay como más pero solo hacer multiples box plots y compar las media de cada una utilizando t test o un kruskal test (solo comparamos dos grupos).
+
+```{r}
+install.packages("ggplot2")
+library(ggplot2)
+library(dplyr)
+
+# Función auxiliar para no repetir código
+plot_box <- function(var, title){
+  ggplot(electric_vehicles_spec_2025, aes(x = origen, y = .data[[var]], fill = origen)) +
+    geom_boxplot(alpha = 0.7) +
+    labs(title = title, x = "Origen", y = var) +
+    scale_fill_manual(values = c("Nativa EV" = "#00AEEF", "Tradicional" = "#FF7F50")) +
+    theme_minimal()
+}
+
+plot_box("range_km", "Rango (km)")
+plot_box("acceleration_0_100_s", "Aceleración 0–100")
+plot_box("efficiency_wh_per_km", "Eficiencia (Wh/km)")
+plot_box("battery_capacity_kWh", "Capacidad de batería (kWh)")
+
+```
+
+Una vez vistos los gráficos, hacemos pruebas no paramétricas tipo Wilcoxon, porque los datos suelen tener colas outliers y distribuciones no normales.
+
+```{r}
+wilcox.test(range_km ~ origen, data=electric_vehicles_spec_2025)
+wilcox.test(acceleration_0_100_s ~ origen, data=electric_vehicles_spec_2025)
+wilcox.test(efficiency_wh_per_km ~ origen, data=electric_vehicles_spec_2025)
+wilcox.test(battery_capacity_kWh ~ origen, data=electric_vehicles_spec_2025)
+```
+
+Aquí pasa algo curioso:\
+De todas las comparaciones, **solo la aceleración sale significativa** (p \< 0.05).\
+Todo lo demás (rango, eficiencia, batería) prácticamente igual entre nativas y tradicionales.
+
+¿Eso qué nos dice?\
+Que por más hype que tengan las nativas EV, **no están construyendo vehículos con especificaciones radicalmente distintas**, al menos no en rango o eficiencia.\
+La diferencia grande está en la aceleración… pero ahí hay truco.
+
+### 3.3 Regresión controlando si el auto es deportivo
+
+Como vimos que la aceleración era diferente entre grupos, la pregunta lógica es:\
+**¿Es realmente por ser Nativa EV, o es porque dentro de en alguno de los dos grupos hay más autos deportivos?**
+
+Aquí metemos un modelo lineal en la que incluimos ademas del parametro origen, a la deportiva tambien, para ver si tiene efecto por ser “deportivo”.
+
+```{r}
+modelo_accel <- lm(acceleration_0_100_s ~ origen + deportivo, 
+                   data = electric_vehicles_spec_2025)
+summary(modelo_accel)
+
+
+
+```
+
+Ahora, al meter el parametro de deportivo, el p-value del origen (si es nativa o tradicional) aumenta, siendo 0.106. Esto es mayor que 0.05, para lo cual podemos concluir que no es suficientemente significato. Esto se debe a la fuerte correlacion entre la acceleracion y si es deportivo.
+
+### 3.4 Conclusion
+
+Al final, lo que se ve clarísimo es que entre marcas nativas EV y tradicionales **no hay mucha diferencia real en rango, eficiencia o tamaño de batería**. O sea, ambos grupos ya están más o menos alineados en cómo diseñan un eléctrico moderno. Lo único que de verdad cambia es la **aceleración**.
+
+Y aquí es donde cae la ficha:\
+la aceleración no cambia porque una marca sea EV nativa o tradicional, **cambia porque el modelo es deportivo.**
+
+La etiqueta de “Nativa EV” o “Tradicional” **no es el factor que realmente separa a los autos eléctricos modernos**.
+
+Si el carro es deportivo, automáticamente baja el 0–100 porque está diseñado para eso. Pero eso no tiene nada que ver con ser EV nativa: es simplemente que esos modelos suelen ser tope de línea, con motores más potentes y setups más agresivos. Igual que en gasolina, pero aqui pasa algo curioso: un Porsche 911 no es más eficiente que un Kia Rio solo porque es Porsche; es deportivo y traga más.
+
+Los carros deportivos de gasolina tienen moteras en las que su tamaño dicta la entrada de combustion. Esto nos muestra qeu aunque un conductor maneje el carro eficientemente, por mas avanzado, caro, y mas potente sea el motor, termina entrando mas gasolina. Por solo estar encendido y en marcha va a tragar mas gasolina que un carro economico.
+
+Entonces la diferencia entre grupos no viene por "ser EV nativo", sino porque **hay más modelos deportivos dentro del grupo tradicional**. El origen explica poco; el carácter del auto (deportivo vs no deportivo) es mucho mas significativo.
+
+## Segmento 4 ¿Influye la bateria en la autonomia?
+
+### 4.1 Introduccion
+
+En el siguiente segmento vamos a analizar específicamente cómo la capacidad de la batería afecta la autonomía del vehículo. Estos dos factores suelen ser determinantes en la decisión de compra de los consumidores cuando se trata de coches eléctricos.
+
+### 4.2 Creacion del modelo lineal y analisis
+
+Para estudiar esta relación, construiremos un modelo lineal simple que nos permita evaluar de forma independiente cómo influye la capacidad de la batería en la autonomía.
+
+En este modelo, la capacidad de la batería funciona como variable independiente, mientras que la autonomía (o rango) actúa como variable dependiente. De esta manera podremos medir de forma directa cómo la capacidad de la batería impacta en la distancia que puede recorrer el vehículo.
+
+```{r}
+modelo_bat_range <- lm(range_km ~ battery_capacity_kWh, data = data)
+summary(modelo_bat_range)
+```
+
+### 4.3 Grafica y analisis
+
+```{r}
+g_batt_range <- ggplot(data, aes(x = battery_capacity_kWh, y = range_km)) +
+  geom_point(alpha = 0.6, color = "red") +
+  geom_smooth(method = "lm", color = "black", linewidth = 1) +
+  theme_minimal() +
+  labs(
+    title = "Capacidad de la Bateria vs Autonomia",
+    x = "Capacidad de la Bateria (kWh)",
+    y = "Autonomia (km)"
+  ) +
+  theme(
+    axis.title.x = element_text(size = 12, face = "bold", margin = margin(t = 10)),
+    axis.title.y = element_text(size = 12, face = "bold", margin = margin(r = 10)),
+    plot.title = element_text(size = 14, face = "bold")
+  )
+
+g_batt_range
+```
+
+Con la gráfica y el modelo podemos observar que la capacidad de la batería es uno de los factores que más influye en la autonomía del vehículo. Al analizar el R-cuadrado, vemos que la capacidad de la batería por sí sola explica aproximadamente el 77% de la variación en la autonomía, lo que indica una relación muy fuerte entre ambas variables. Además, el F-estadístico y su p-value extremadamente pequeño confirman que el modelo es altamente significativo. Por último, al estudiar la relación directa, podemos ver que, a medida que aumenta la capacidad de la batería, también aumenta la autonomía del vehículo. Esto se aprecia tanto en la gráfica como en el coeficiente positivo del modelo, que evidencia que una mayor capacidad se traduce en un mayor rango de conducción.
+
+### 4.4 Predicciones
+
+Según el comportamiento del coeficiente:
+
+Cada incremento de 1 kWh en la batería aumenta la autonomía en una cantidad fija (según el valor exacto del coeficiente del modelo).
+
+La relación es prácticamente lineal, lo que significa que duplicar la batería incrementa la autonomía casi en la misma proporción (hasta donde lo permiten los datos reales de la muestra).
+
+Los vehículos con baterías pequeñas (\<40 kWh) tienen rangos claramente más reducidos.
+
+Los vehículos con baterías grandes (\>70 kWh) suelen superar los 300–400 km fácilmente.
+
+Por tanto, el modelo predice que la autonomía crece de forma estable y sostenida con la capacidad de la batería.
+
+### 4.5 Conclusiones
+
+El modelo lineal simple confirma que la capacidad de la batería es el factor más determinante de la autonomía. La relación es significativa, fuerte y positiva: a medida que aumenta la capacidad de la batería, aumenta la autonomía del vehículo. Con un R-cuadrado de alrededor del 77%, el modelo permite predecir la autonomía con bastante precisión, mostrando que la batería explica la mayor parte de las diferencias de rango entre coches eléctricos.
+
+## Segmento 5 ¿Como el tipo de coche y su tamaño afectan su autonomia y su eficiencia?
+
+![](images/all-about-car-dimensions-_-Body-4-15-2-24-1024x640.jpg)
+
+En este segmento analizaremos cómo el tamaño y el tipo del vehículo influyen en la eficiencia energética y en la autonomía de los coches eléctricos. Para ello consideraremos distintos parámetros estructurales del vehículo, como sus dimensiones, el número de asientos y el tipo de carrocería. Estos factores suelen ser determinantes en el diseño y desempeño del vehículo, y pueden ayudar a explicar por qué ciertos modelos consumen más energía o recorren mayores distancias que otros.
+
+### 5.1 Las dimensiones y su efecto la eficiencia y autonomia
+
+Comenzaremos evaluando el efecto de las dimensiones físicas —largo, ancho y altura— mediante dos modelos lineales múltiples: uno orientado a predecir la eficiencia y otro orientado a predecir la autonomía. Esto nos permitirá identificar si el tamaño del vehículo es realmente un factor relevante. Posteriormente, complementaremos el análisis estudiando el número de asientos y el tipo de carrocería mediante pruebas ANOVA, con el fin de determinar si estos grupos presentan diferencias significativas en eficiencia y autonomía.
+
+#### 5.1.1 Modelo lineal multiple para eficiencia
+
+```{r}
+modelo_dim_eff <- lm(efficiency_wh_per_km ~ length_mm + width_mm + height_mm, data = data)
+summary(modelo_dim_eff)
+```
+
+El modelo lineal que relaciona las dimensiones del vehículo (longitud, ancho y altura) con la eficiencia energética nos permite evaluar si el tamaño del coche tiene un papel relevante en el consumo de energía. Para comenzar, el modelo muestra un p-value global muy pequeño, lo que indica que es estadísticamente significativo. Esto significa que, en conjunto, las dimensiones del vehículo sí aportan información útil para explicar las variaciones en la eficiencia.
+
+Sin embargo, al revisar el R-cuadrado, observamos que el modelo solo explica una parte limitada de la variación total de la eficiencia. Esto sugiere que, aunque el tamaño del vehículo influye en cierta medida, no es uno de los factores principales que determinan el consumo energético, especialmente si lo comparamos con otras variables como la autonomía o la capacidad de la batería.
+
+En cuanto a los coeficientes, ninguno de ellos presenta una significancia estadística fuerte. Las pendientes asociadas a la longitud, el ancho y la altura son pequeñas y no muestran relaciones claras con la eficiencia. Esto confirma que las variaciones en las dimensiones del vehículo no generan cambios relevantes en el consumo Wh/km, y que este aspecto del diseño no parece ser determinante desde la perspectiva energética.
+
+En conjunto, el modelo nos indica que las dimensiones físicas del coche no explican de manera significativa su eficiencia, y que otros factores mecánicos o estructurales tienen un peso mucho mayor en cómo se comporta energéticamente cada vehículo eléctrico.
+
+#### 5.1.2 Graficas para la eficiencia
+
+```{r}
+g_len_eff <- ggplot(data, aes(x = length_mm, y = efficiency_wh_per_km)) +
+  geom_point(alpha = 0.5, color = "steelblue") +
+  geom_smooth(method = "lm", color = "red", linewidth = 1) +
+  theme_minimal() +
+  labs(title = "Longitud del Vehiculo vs Eficiencia",
+       x = "Longitud (mm)",
+       y = "Eficiencia (Wh/km)")
+
+g_len_eff
+```
+
+Esta gráfica muestra la relación entre la longitud del vehículo y su eficiencia energética (Wh/km). Los puntos no siguen una tendencia marcada y la línea de regresión es casi plana. Esto indica que la longitud del coche no tiene un impacto significativo en su eficiencia. Los vehículos más largos no consumen notablemente más ni menos energía por kilómetro.
+
+```{r}
+g_wid_eff <- ggplot(data, aes(x = width_mm, y = efficiency_wh_per_km)) +
+  geom_point(alpha = 0.5, color = "darkgreen") +
+  geom_smooth(method = "lm", color = "red", linewidth = 1) +
+  theme_minimal() +
+  labs(title = "Ancho del Vehiculo vs Eficiencia",
+       x = "Ancho (mm)",
+       y = "Eficiencia (Wh/km)")
+
+g_wid_eff
+```
+
+Aquí se compara el ancho del vehículo con su eficiencia. La dispersión de los puntos es amplia y la pendiente de la línea de tendencia es mínima. El ancho del vehículo tampoco parece afectar de forma importante el consumo energético. No se observa relación clara entre mayor anchura y mayor o menor eficiencia.
+
+```{r}
+g_hei_eff <- ggplot(data, aes(x = height_mm, y = efficiency_wh_per_km)) +
+  geom_point(alpha = 0.5, color = "purple") +
+  geom_smooth(method = "lm", color = "red", linewidth = 1) +
+  theme_minimal() +
+  labs(title = "Altura del Vehiculo vs Eficiencia",
+       x = "Altura (mm)",
+       y = "Eficiencia (Wh/km)")
+
+g_hei_eff
+
+```
+
+En esta gráfica se aprecia cómo cambia la eficiencia según la altura del vehículo. Los puntos presentan variación, pero la línea de regresión muestra una inclinación muy débil. La altura del coche no muestra una relación fuerte con la eficiencia. Aunque vehículos más altos pueden tener más resistencia aerodinámica, en el conjunto de datos no aparece como un factor determinante en el consumo.
+
+#### 5.1.3 Modelo lineal multiple para la autonomia
+
+Ahora podemo estudiar si las diemnsiones tienen algun efecto en la autonomia del coche tambien con un modelo lineal multiple y us respectivas graficas.
+
+```{r}
+modelo_dim_range <- lm(range_km ~ length_mm + width_mm + height_mm, data = data)
+
+summary(modelo_dim_range)
+```
+
+El modelo lineal que relaciona las dimensiones del vehículo con la autonomía busca determinar si el tamaño del coche tiene un impacto real en la distancia que puede recorrer. En primer lugar, el modelo resulta estadísticamente significativo, ya que el p-value global es muy pequeño. Esto indica que, en conjunto, las dimensiones físicas sí explican parte de la variación observada en la autonomía.
+
+Al revisar el R-cuadrado, vemos que el modelo explica una proporción considerablemente mayor de la variabilidad en la autonomía que en el caso de la eficiencia. Esto sugiere que el tamaño del vehículo tiene una relación más evidente con su capacidad de recorrido que con su consumo energético por kilómetro.
+
+Sin embargo, al analizar los coeficientes individuales, encontramos que no todas las dimensiones son significativas. Algunas presentan una relación débil o no significativa, lo que implica que no todos los aspectos del tamaño influyen de la misma manera. Aun así, el modelo muestra que existe una tendencia general: ciertos componentes del tamaño sí se asocian con cambios en la autonomía, aunque el impacto no sea igual para todas las dimensiones.
+
+En conjunto, el modelo indica que las dimensiones del vehículo tienen un efecto moderado sobre la autonomía, más fuerte que sobre la eficiencia, pero no suficientemente determinante como para explicar por sí solas el comportamiento de cada vehículo eléctrico.
+
+#### 5.1.4 Graficas para la autonomia
+
+```{r}
+g_len_range <- ggplot(data, aes(x = length_mm, y = range_km)) +
+  geom_point(alpha = 0.5, color = "steelblue") +
+  geom_smooth(method = "lm", color = "red", linewidth = 1) +
+  theme_minimal() +
+  labs(
+    title = "Autonomia vs Longitud del Vehiculo",
+    x = "Longitud (mm)",
+    y = "Autonomia (km)"
+  ) +
+  theme(
+    axis.title = element_text(face = "bold"),
+    plot.title = element_text(face = "bold", size = 14)
+  )
+
+g_len_range
+```
+
+La gráfica muestra cómo cambia la autonomía según la longitud del vehículo. Los puntos están dispersos y la línea de regresión es casi plana. No se observa una relación fuerte entre la longitud del coche y la autonomía; la longitud no parece afectar de forma relevante el rango del vehículo.
+
+```{r}
+g_wid_range <- ggplot(data, aes(x = width_mm, y = range_km)) +
+  geom_point(alpha = 0.5, color = "darkgreen") +
+  geom_smooth(method = "lm", color = "red", linewidth = 1) +
+  theme_minimal() +
+  labs(
+    title = "Autonomia vs Ancho del Vehiculo",
+    x = "Ancho (mm)",
+    y = "Autonomia (km)"
+  ) +
+  theme(
+    axis.title = element_text(face = "bold"),
+    plot.title = element_text(face = "bold", size = 14)
+  )
+
+g_wid_range
+```
+
+Esta gráfica compara el ancho del vehículo con su autonomía. La nube de puntos no sigue un patrón claro y la pendiente de la línea de tendencia es mínima. El ancho del vehículo no muestra una relación significativa con la autonomía; no parece influir en la distancia que puede recorrer.
+
+```{r}
+g_hei_range <- ggplot(data, aes(x = height_mm, y = range_km)) +
+  geom_point(alpha = 0.5, color = "purple") +
+  geom_smooth(method = "lm", color = "red", linewidth = 1) +
+  theme_minimal() +
+  labs(
+    title = "Autonomia vs Altura del Vehiculo",
+    x = "Altura (mm)",
+    y = "Autonomia (km)"
+  ) +
+  theme(
+    axis.title = element_text(face = "bold"),
+    plot.title = element_text(face = "bold", size = 14)
+  )
+
+g_hei_range
+```
+
+La gráfica presenta la relación entre la altura del vehículo y su autonomía. Aunque hay variación en los datos, la tendencia general es muy débil. La altura del coche no parece ser un factor determinante en la autonomía; no se observa una conexión clara entre ambas variables.
+
+#### 5.1.5 Conclusiones
+
+En resumen, al comparar las dimensiones del vehículo con la autonomía podemos concluir que el tamaño del coche tiene un impacto real pero limitado. El modelo es significativo y el R-cuadrado sugiere que las dimensiones explican una parte importante de la variación en la autonomía, aunque no toda. Además, los coeficientes muestran que no todas las dimensiones influyen por igual.
+
+Esto significa que, si bien el tamaño del vehículo contribuye a la autonomía, existen otros factores —como la capacidad de la batería, la eficiencia del motor y el diseño aerodinámico— que juegan un papel mucho más determinante en el rendimiento final del coche eléctrico.
+
+### 5.2 El tipo de vehciulo y el numero de asientos y como afectan la autonomia y la eficiencia
+
+#### 5.2.1 Introduccion
+
+Ya evaluados los modelos lineales para las dimensiones del vehículo, podemos pasar a estudiar cómo el número de asientos y el tipo de carrocería afectan la autonomía y la eficiencia, y si realmente estos factores son significativos. Para este análisis utilizaremos pruebas ANOVA, que nos permiten comparar si existen diferencias entre los distintos grupos.
+
+#### 5.2.2 Test anova y grafica para comparacion entre asientos y la eficiencia
+
+Comenzamos analizando cómo la cantidad de asientos influye en la eficiencia y la autonomía. El número de asientos suele darnos una idea del tipo de coche —por ejemplo, si es un vehículo compacto, familiar o de mayor capacidad— y también puede reflejar diferencias en peso, tamaño y propósito del vehículo. Por esta razón, es un buen indicador para evaluar si los coches con más asientos consumen más energía por kilómetro o si presentan autonomías distintas en comparación con los de menor capacidad. Empezamos comparando la eficiencia con el numero de asientos.
+
+```{r}
+anova_eff_seats <- aov(efficiency_wh_per_km ~ factor(seats), data = data)
+summary(anova_eff_seats)
+```
+
+El ANOVA muestra que el número de asientos tiene un efecto altamente significativo sobre la eficiencia energética del vehículo. El valor del estadístico F es 67.03, un valor elevado, lo que indica que las diferencias entre los grupos son mucho mayores que la variación interna dentro de cada grupo.
+
+El p-value \< 2e-16 confirma que estas diferencias no se deben al azar. Por lo tanto, podemos concluir que el número de asientos sí influye de manera clara en la eficiencia, y que los vehículos con distinta capacidad de pasajeros presentan consumos energéticos significativamente distintos.
+
+En resumen, el análisis deja evidencia sólida de que la eficiencia del vehículo cambia según la cantidad de asientos, lo que sugiere que este factor —relacionado con tamaño, peso y propósito del coche— es relevante en el comportamiento energético de los coches eléctricos.
+
+```{r}
+g_eff_seats <- ggplot(data, aes(x = factor(seats), y = efficiency_wh_per_km)) +
+  geom_boxplot(fill = "lightblue", color = "black") +
+  theme_minimal() +
+  labs(
+    title = "Eficiencia segun Numero de Asientos",
+    x = "Numero de Asientos",
+    y = "Eficiencia (Wh/km)"
+  ) +
+  theme(
+    axis.title = element_text(face="bold"),
+    plot.title = element_text(face="bold", size=14)
+  )
+
+g_eff_seats
+```
+
+El boxplot muestra cómo varía la eficiencia energética (Wh/km) entre los diferentes números de asientos. Se observan diferencias claras entre los grupos, con medianas y distribuciones que no coinciden entre sí.
+
+#### 5.2.3 Test anova y grafica para comparacion de asientos y autonomia
+
+Ahora hacemos el test anova para estudiar si el numero de asientos afecta la autonomia del coche.
+
+```{r}
+anova_range_seats <- aov(range_km ~ factor(seats), data = data)
+summary(anova_range_seats)
+```
+
+El ANOVA indica que el número de asientos tiene un efecto altamente significativo sobre la autonomía del vehículo. El valor del estadístico F es 17.98, lo que refleja diferencias marcadas entre los grupos en comparación con la variabilidad interna dentro de cada grupo.
+
+El p-value \< 2e-16 confirma que estas diferencias no son producto del azar. Por lo tanto, podemos concluir que la autonomía sí cambia de manera significativa dependiendo de la cantidad de asientos. Esto implica que vehículos con diferente capacidad —y, por extensión, distinto tamaño y peso— presentan rangos distintos.
+
+En conjunto, este resultado muestra que la capacidad del vehículo es un factor relevante que influye en la autonomía de los coches eléctricos.
+
+```{r}
+g_range_seats <- ggplot(data, aes(x = factor(seats), y = range_km)) +
+  geom_boxplot(fill = "lightgreen", color = "black") +
+  theme_minimal() +
+  labs(
+    title = "Autonomia segun Numero de Asientos",
+    x = "Numero de Asientos",
+    y = "Autonomia (km)"
+  ) +
+  theme(
+    axis.title = element_text(face="bold"),
+    plot.title = element_text(face="bold", size=14)
+  )
+
+g_range_seats
+```
+
+El boxplot muestra cómo varía la autonomía según el número de asientos. Las medianas y la dispersión de los grupos difieren entre sí, indicando que algunos tipos de vehículos alcanzan rangos mayores que otros.
+
+#### 5.2.4 Test anova y grafica para comparacion tipo de carroceria y eficiencia
+
+También analizamos cómo el tipo de carrocería influye en la eficiencia y la autonomía del vehículo. La carrocería es un factor importante porque resume parte del diseño estructural del coche: por ejemplo, las diferencias entre un sedán, un SUV, un hatchback o un crossover suelen implicar variaciones en peso, aerodinámica, resistencia al viento, altura y propósito del modelo. Estas características afectan directamente el consumo energético y la distancia que el vehículo puede recorrer. Por esta razón, estudiar el tipo de carrocería nos permite evaluar si ciertos estilos de diseño tienden a ser más eficientes o a ofrecer autonomías mayores que otros. Para comenzar, comparamos la eficiencia entre los distintos tipos de carrocería.
+
+```{r}
+anova_eff_body <- aov(efficiency_wh_per_km ~ car_body_type, data = data)
+summary(anova_eff_body)
+```
+
+Los resultados del ANOVA muestran que el tipo de carrocería tiene un efecto altamente significativo sobre la eficiencia energética del vehículo. El estadístico F es 28.91, un valor elevado, lo que indica que las diferencias entre los tipos de carrocería son mucho mayores que la variabilidad dentro de cada grupo.
+
+El p-value \< 2e-16 confirma que estas diferencias no se deben al azar. Por lo tanto, podemos concluir que la eficiencia cambia de manera notable según la carrocería del vehículo. En términos prácticos, esto significa que ciertos estilos de diseño —como SUV, sedán, hatchback o crossover— presentan consumos energéticos distintos debido a variaciones en aerodinámica, altura, peso y resistencia al viento.
+
+En resumen, este ANOVA demuestra que el tipo de carrocería sí es un factor determinante en la eficiencia energética de los vehículos eléctricos, y que algunos segmentos del mercado tienden a consumir más o menos energía por kilómetro que otros.
+
+```{r}
+g_eff_body <- ggplot(data, aes(x = car_body_type, y = efficiency_wh_per_km)) +
+  geom_boxplot(fill = "lightblue", color = "black") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle=90, vjust=0.5, hjust=1)) +
+  labs(
+    title = "Eficiencia segun Tipo de Carroceria",
+    x = "Tipo de Carroceria",
+    y = "Eficiencia (Wh/km)"
+  )
+g_eff_body
+```
+
+El boxplot muestra cómo varía la eficiencia energética entre los distintos tipos de carrocería. Se observan diferencias claras en las medianas y en la dispersión de cada grupo, lo que indica que algunos estilos de carrocería presentan consumos más altos o más bajos que otros.
+
+####5.2.5 Test anova y grafica para tipo de carroceria y autonomia
+
+```{r}
+anova_range_body <- aov(range_km ~ car_body_type, data = data)
+summary(anova_range_body)
+```
+
+El ANOVA muestra que el tipo de carrocería tiene un efecto muy significativo sobre la autonomía del vehículo. El estadístico F es 72.02, un valor bastante alto, lo que indica que las diferencias en autonomía entre las distintas carrocerías son mucho mayores que la variación interna dentro de cada grupo.
+
+El p-value \< 2e-16 confirma que estas diferencias no son producto del azar. En consecuencia, podemos afirmar que la autonomía sí varía de forma importante según la carrocería del coche. Esto tiene sentido porque diferentes tipos de carrocería —como SUV, sedán, hatchback o crossover— presentan diferencias estructurales relevantes, como peso, tamaño, resistencia aerodinámica y propósito del diseño, factores que afectan directamente la distancia que un vehículo puede recorrer con una carga.
+
+En conjunto, este ANOVA demuestra que la carrocería es un factor determinante en la autonomía: algunos tipos ofrecen rangos significativamente mayores, mientras que otros muestran autonomías más limitadas.
+
+```{r}
+g_range_body <- ggplot(data, aes(x = car_body_type, y = range_km)) +
+  geom_boxplot(fill = "lightgreen", color = "black") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle=90, vjust=0.5, hjust=1)) +
+  labs(
+    title = "Autonomía según Tipo de Carrocería",
+    x = "Tipo de Carrocería",
+    y = "Autonomía (km)"
+  )
+g_range_body
+
+```
+
+El boxplot muestra cómo varía la autonomía entre los distintos tipos de carrocería. Se observan diferencias marcadas en las medianas y en la dispersión de cada grupo, lo que indica que ciertos estilos de carrocería permiten recorrer mayores distancias que otros.
+
+El análisis mediante pruebas ANOVA nos permitió evaluar si características estructurales del vehículo, como el número de asientos y el tipo de carrocería, influyen realmente en la eficiencia y la autonomía de los coches eléctricos. En ambos casos, los resultados muestran efectos altamente significativos, indicando que estos factores sí generan diferencias reales en el rendimiento energético del vehículo.
+
+En el caso del número de asientos, tanto la eficiencia como la autonomía cambian de manera importante entre las distintas configuraciones. Esto refleja que la capacidad del vehículo, que suele asociarse con variaciones en tamaño, peso y diseño, tiene un impacto directo en su consumo y en la distancia que puede recorrer.
+
+De forma similar, el tipo de carrocería también muestra diferencias marcadas en eficiencia y autonomía. Este resultado confirma que elementos como la aerodinámica, el perfil del vehículo, su altura y su propósito general influyen significativamente en el desempeño energético. Algunas carrocerías permiten sacar mayor provecho de la energía disponible, mientras que otras presentan mayores pérdidas debido a su diseño.
+
+En conjunto, estos análisis demuestran que no solo las características mecánicas y de la batería determinan el rendimiento de un coche eléctrico, sino también aspectos estructurales del vehículo. Tanto la capacidad (asientos) como la carrocería deben considerarse factores relevantes cuando se evalúa la eficiencia y la autonomía en este tipo de vehículos.
+
+### 5.3 Conclusion
+
+En general, los resultados muestran que las dimensiones físicas del vehículo (longitud, ancho y altura) no tienen un efecto significativo ni sobre la eficiencia ni sobre la autonomía, por lo que el tamaño estructural por sí solo no determina el rendimiento energético. Sin embargo, otros factores asociados al tamaño sí resultan relevantes: los vehículos con menos asientos y carrocerías compactas tienden a ser los más eficientes, mientras que los de mayor capacidad y carrocerías más grandes, como SUVs o crossovers, presentan autonomías superiores debido a que suelen incorporar baterías más grandes. En resumen, los coches compactos son más eficientes energéticamente, mientras que los vehículos más grandes logran recorrer mayores distancias por carga, aunque a costa de un consumo más elevado por kilómetro.
+
+## Conclusion
+
+Los resultados del análisis muestran que el comportamiento de los vehículos eléctricos desafía muchas de las ideas heredadas del mundo de los autos de combustión interna.
+
+**1. La eficiencia energética está dominada por variables internas del tren motriz, no por el tamaño físico del auto.**\
+La autonomía y la capacidad de la batería explican una parte enorme de la variabilidad en eficiencia:
+
+-   Baterías grandes → consumos mayores (más Wh/km).
+
+-   Autonomías largas → eficiencia superior.\
+    Las dimensiones (largo, ancho, altura) influyen poco: el tamaño no determina directamente el consumo.
+
+**2. Los vehículos “deportivos” eléctricos NO muestran el trade-off clásico que existe en gasolina.**\
+En motores de combustión, más potencia = más consumo = menos rango.\
+En eléctricos, encontramos lo contrario:
+
+-   **Los que aceleran más rápido tienden a tener más rango.**
+
+-   El coeficiente negativo del modelo indica que cada segundo adicional en el 0–100 reduce \~27 km de autonomía.
+
+-   La razón no es mágica ni un error: los modelos más rápidos suelen incluir **baterías más grandes, motores más eficientes y arquitectura premium**, algo que no se puede separar del concepto “deportivo” en EV modernos.
+
+**3. El origen del fabricante (Nativa EV vs Tradicional) no determina realmente las especificaciones del coche.**\
+Las pruebas muestran que:
+
+-   No hay diferencias significativas en rango, eficiencia ni capacidad de batería.
+
+-   La única diferencia aparece en aceleración.
+
+-   Pero esa diferencia **desaparece** cuando se controla por “deportivo”, lo que confirma que el origen no explica la aceleración: **el carácter deportivo del modelo sí**.
+
+**4. La capacidad de la batería es el predictor más fuerte de autonomía.**
+
+-   Un modelo lineal simple explica \~77% de la variación total.
+
+-   Es la relación más fuerte de toda la base: más kWh → más kilómetros, casi de manera proporcional.
+
+**5. Factores estructurales como número de asientos y tipo de carrocería SÍ generan diferencias reales.**\
+Los ANOVA muestran efectos muy significativos:
+
+-   Más asientos → menor eficiencia y menor autonomía promedio.
+
+-   SUV / crossover → consumos más altos y rangos mayores (porque suelen tener baterías grandes).
+
+-   Autos compactos → más eficientes, pero con rangos más limitados.
+
+### Limitaciones de los datos
+
+Aunque el análisis permitió identificar patrones sólidos y relaciones estadísticamente significativas, es importante reconocer que la base de datos también presenta limitaciones que condicionan la interpretación final de los resultados. Estas limitaciones no invalidan los hallazgos, pero sí señalan aspectos donde sería necesario incorporar variables adicionales para obtener una comprensión más completa del comportamiento real de los vehículos eléctricos.
+
+#### **1. Ausencia del precio del vehículo**
+
+El precio es probablemente la variable faltante más crítica.\
+Prácticamente todas las relaciones que encontramos —aceleración vs. rango, eficiencia vs. marca, autonomía vs. batería— podrían estar mediadas por el costo del automóvil.
+
+En el mercado actual de EV:
+
+-   Los vehículos **más rápidos** suelen tener **baterías más grandes**, mejores motores, celdas más densas y aerodinámica optimizada.
+
+-   Todo esto está fuertemente correlacionado con un precio más alto.
+
+Esto implica que muchas de las diferencias atribuidas a ser “deportivo”, de “marca nativa EV” o de cierto segmento, podrían en realidad explicarse por **segmentación económica del mercado**, no por ingeniería aislada.
+
+Sin información de precios, las conclusiones sobre causalidad deben tomarse con cautela.
+
+#### **2. Falta de medidas directas de potencia del motor (hp, kW)**
+
+Otro vacío importante es la ausencia de métricas como:
+
+-   Potencia nominal del motor (hp o kW)
+
+-   Potencia pico
+
+-   Relación peso/potencia
+
+-   Estas variables son esenciales para entender:
+
+-   Qué tan “deportivo” es realmente un modelo.
+
+-   Cuánta energía puede entregar vs. cuánta consume.
+
+-   Si la aceleración está explicada por la potencia o por otros factores (como la batería o la aerodinámica).
+
+La ausencia de potencia hace que el indicador “deportivo” basado solo en aceleración sea útil, pero **incompleto desde un punto de vista ingenieril**.
+
+#### **3. Peso del vehículo: clave pero ausente**
+
+El peso es uno de los determinantes más importantes del rango, la eficiencia y la aceleración.
+
+Sin peso en los datos no podemos:
+
+-   Ajustar los modelos para saber si un EV deportivo es rápido por potencia o por peso reducido.
+
+-   Entender si SUVs grandes tienen baja eficiencia por peso o por aerodinámica.
+
+-   Separar efectos de tamaño vs. tren motriz.
+
+#### **4. Dinámicas de conducción y ciclos de prueba**
+
+Las cifras como rango y eficiencia (Wh/km) dependen del ciclo bajo el cual se midieron:
+
+-   WLTP
+
+-   EPA
+
+-   NEDC (ya obsoleto pero a veces reportado)
+
+-   Ciclos chinos CLTC
+
+Sin información del protocolo, las comparaciones entre vehículos de regiones distintas pueden estar sesgadas por diferencias metodológicas más que por diferencias reales.
+
+#### **5. No incluye variabilidad real de uso**
+
+Todos los valores del dataset son **especificaciones oficiales**, no datos reales en uso.\
+Esto implica que no capturan:
+
+-   Clima
+
+-   Temperatura de operación
+
+-   Estilo de conducción
+
+-   Velocidad promedio
+
+-   Uso de aire acondicionado
+
+-   Degradación de la batería
+
+-   Estado de carga (SoC) durante las pruebas
+
+-   Por lo tanto, el análisis refleja **potencial técnico**, no comportamiento real.
+
+#### **6. Categorías simplificadas**
+
+Algunas variables creadas (como “deportivo”, “nativa EV”) son útiles para análisis general, pero:
+
+-   No consideran matices internos de cada marca (Tesla Model 3 vs Tesla Model X son mundos distintos).
+
+-   Asumen que la aceleración define lo deportivo, cuando muchos factores contribuyen a esta identidad.
+
+-   No distinguen entre plataformas nuevas y adaptadas en marcas tradicionales.
+
+Estas etiquetas funcionan bien para análisis exploratorio, pero no capturan la complejidad completa del mercado.
+
+#### **7. Datos faltantes o inconsistentes**
+
+Aunque el dataset es amplio, algunas variables tienen NA o rangos incompletos (altura, ancho, celdas, torque), lo que redujo el tamaño efectivo de ciertos modelos estadísticos y moderó la robustez en algunos subsegmentos.
